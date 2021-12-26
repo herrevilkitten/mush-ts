@@ -1,44 +1,93 @@
+import { Thing } from "../models/thing";
+import { functionParser, executeFunction } from "./function-parser";
+
 export const MAX_STACK_DEPTH = 30;
 
 export interface StackFrameOptions {
   vm: VirtualMachine;
   depth: number;
-  label: string;
+  input: string;
+  index: number;
 }
 
-export class VirtualStackFrame implements StackFrameOptions {
+export class StackFrame implements StackFrameOptions {
   vm: VirtualMachine;
   depth: number;
-  label: string;
+  input: string;
+  index: number;
+  name = "";
+  parameters: string[] = [];
 
   constructor(options: StackFrameOptions) {
     this.vm = options.vm;
     this.depth = options.depth;
-    this.label = options.label;
+    this.input = options.input;
+    this.index = options.index;
   }
 }
 
-export class VirtualMachine {
-  frames: VirtualStackFrame[] = [];
+export interface VirtualMachineOptions {
+  actor: Thing;
+  input: string;
+  index?: number;
+}
+
+export class VirtualMachine implements VirtualMachineOptions {
+  actor: Thing;
+  stack: StackFrame[] = [];
   registers: Record<string, string> = {};
+  input: string;
+
+  constructor(options: VirtualMachineOptions) {
+    this.actor = options.actor;
+    this.input = options.input;
+  }
 
   peek() {
-    if (this.frames.length === 0) {
+    if (this.stack.length === 0) {
       return undefined;
     }
-    return this.frames[this.frames.length - 1];
+    return this.stack[this.stack.length - 1];
   }
 
   pop() {
-    return this.frames.pop();
+    return this.stack.pop();
   }
 
-  push(frame: StackFrameOptions) {
-    if (this.frames.length > MAX_STACK_DEPTH) {
+  push(index: number) {
+    if (this.stack.length > MAX_STACK_DEPTH) {
       throw new Error(`Maximum stack depth ${MAX_STACK_DEPTH} exceeded.`);
     }
-    frame.vm = this;
-    frame.depth = this.frames.length;
-    return this.frames.push(new VirtualStackFrame(frame));
+    const frame = {
+      vm: this,
+      depth: this.stack.length,
+      input: this.input,
+      index: index,
+    };
+    return this.stack.push(new StackFrame(frame));
+  }
+
+  evaluate(index = 0) {
+    this.push(index);
+    const fn = functionParser(this);
+    console.log("Parse:", fn);
+    let frame = this.peek();
+    if (!frame) {
+      throw new Error(`Stack error. No frame during evaluation.`);
+    }
+    frame.name = fn.name;
+    frame.parameters = fn.parameters;
+    const result = executeFunction(frame);
+    console.log("Execute:", result);
+    this.pop();
+    return { value: result, index: fn.index + 1 };
+  }
+
+  run() {
+    const result = this.evaluate(0);
+    if (this.stack.length > 0) {
+      throw new Error(`Stack error. Stack is not empty at termination.`);
+    }
+    return result.value;
   }
 }

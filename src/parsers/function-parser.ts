@@ -1,36 +1,69 @@
-function addFn(values: string[]) {
-  return String(values.reduce((prev, curr) => prev + Number(curr), 0));
+import { StackFrame, VirtualMachine } from "./virtual-machine";
+
+export type VirtualMachineFunction = (frame: StackFrame) => string | undefined | void;
+
+function addFn(frame: StackFrame) {
+  return String(frame.parameters.reduce((prev, curr) => prev + Number(curr), 0));
 }
 
-function nameFn(values: string[]) {
-  if (values.length) {
-    return "Earl<" + values.join(",") + ">";
+function nameFn(frame: StackFrame) {
+  let result = frame.vm.actor.name;
+  if (frame.parameters.length) {
+    result = result + "<" + frame.parameters.join(",") + ">";
   }
-  return "Earl";
+  return result;
 }
 
-const FUNCTION_LOOKUP: Record<string, (values: string[]) => string> = {
+function repeatFn(frame: StackFrame) {
+  if (frame.parameters.length !== 2) {
+    throw new Error(`Function error. ${frame.name} expects 2 parameters`);
+  }
+
+  return frame.parameters[0].repeat(parseInt(frame.parameters[1]) || 1);
+}
+
+const FUNCTION_LOOKUP: Record<string, VirtualMachineFunction> = {
   add: addFn,
   name: nameFn,
+  repeat: repeatFn,
 };
 
-export function executeFunction(name: string, parameters: string[]) {
-  const fn = FUNCTION_LOOKUP[name];
+export function executeFunction(frame: StackFrame) {
+  const fn = FUNCTION_LOOKUP[frame.name];
+  let result: string | undefined | void = "";
   if (fn) {
-    return fn(parameters);
-  } else {
-    return "";
+    result = fn(frame);
   }
+
+  if (result === undefined) {
+    result = "";
+  }
+  return result;
 }
 
-export function functionParser(text: string, index: number) {
+export function functionParser(vm: VirtualMachine) {
+  let frame = vm.peek();
+  if (frame === undefined) {
+    throw new Error(`Trying to parse function in empty stack.`);
+  }
+
+  let index = frame.index;
+  let input = frame.input;
   let state: "name" | "parameters" = "name";
   let previous = "";
   let name = "";
   let parameters: string[] = [];
   let parameterIndex = 0;
-  LOOP: for (; index < text.length; ++index) {
-    let current = text[index];
+
+  function addParameterValue(current: string) {
+    if (parameters[parameterIndex] === undefined) {
+      parameters.push("");
+    }
+    parameters[parameterIndex] = parameters[parameterIndex] + current;
+  }
+
+  LOOP: for (; index < input.length; ++index) {
+    let current = input[index];
     switch (state) {
       case "name":
         if (current === "(") {
@@ -43,32 +76,31 @@ export function functionParser(text: string, index: number) {
         break;
       case "parameters":
         if (previous === "%") {
-          if (parameters[parameterIndex] === undefined) {
-            parameters.push("");
+          switch (current) {
+            case "n":
+              addParameterValue(vm.actor.name);
+              break;
+            default:
+              addParameterValue(current);
+              break;
           }
-          parameters[parameterIndex] = parameters[parameterIndex] + current;
         } else {
           if (current === "%") {
             // Escape this
           } else if (current === "[") {
-            const fn = functionParser(text, index + 1);
-            console.log("Parser:", fn);
-            const result = executeFunction(fn.name, fn.parameters);
-            if (parameters[parameterIndex] === undefined) {
-              parameters.push("");
-            }
+            const result = vm.evaluate(index + 1);
+            addParameterValue(result.value);
+            index = result.index;
             console.log("Result:", result);
-            parameters[parameterIndex] = parameters[parameterIndex] + result;
-            index = fn.index + 1;
+            if (input[index] !== "]") {
+              throw new Error(`Syntax error. Unexpected token ${input[index]}. Expecting ]`);
+            }
           } else if (current === ")") {
             break LOOP;
           } else if (current === ",") {
             parameterIndex++;
           } else {
-            if (parameters[parameterIndex] === undefined) {
-              parameters.push("");
-            }
-            parameters[parameterIndex] = parameters[parameterIndex] + current;
+            addParameterValue(current);
           }
         }
         break;

@@ -1,19 +1,17 @@
-import { evaluateText, parseText } from "./interpreter";
+import { Thing } from "./models/thing";
+import { VirtualMachine } from "./parsers/virtual-machine";
 
-const tests = ["Hello", "Hello [name()]"];
-tests.forEach((test) => {
-  console.log("Before:", test);
-  console.log("After: ", parseText(test, 0));
-});
+const tests2 = ["add(1,2,3,4)", "name()", "name([add(1,2,3)])", "name(1, ,[add(1,2,3)])", "repeat(%n,3)"];
 
-import { executeFunction, functionParser } from "./parsers/function-parser";
-
-const tests2 = ["add(1,2,3,4)", "name()", "name([add(1,2,3)])", "name(1, ,[add(1,2,3)])"];
+const actor = new Thing();
+actor.name = "Earl";
 
 tests2.forEach((test) => {
   console.log(`>>> Testing function parser: ${test}`);
-  const fn = functionParser(test, 0);
-  console.log(`Parsed as:`, fn);
-  const results = executeFunction(fn.name, fn.parameters);
+  const vm = new VirtualMachine({
+    actor,
+    input: test,
+  });
+  const results = vm.run();
   console.log(`Result:`, results);
 });
