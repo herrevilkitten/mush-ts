@@ -1,7 +1,13 @@
 import { Thing } from "../models/thing";
-import { functionParser, executeFunction } from "./function-parser";
+import { functionParser, executeFunction, textParser } from "../parsers/function-parser";
 
 export const MAX_STACK_DEPTH = 30;
+
+export type VirtualMachineFunction = (frame: StackFrame) => string | undefined | void;
+
+export type VirtualMachineSubstituion =
+  | string
+  | ((value: string, frame: StackFrame) => string | { value: string; index: number });
 
 export interface StackFrameOptions {
   vm: VirtualMachine;
@@ -17,6 +23,7 @@ export class StackFrame implements StackFrameOptions {
   index: number;
   name = "";
   parameters: string[] = [];
+  stackRegisters: Record<string, string> = {};
 
   constructor(options: StackFrameOptions) {
     this.vm = options.vm;
@@ -35,7 +42,7 @@ export interface VirtualMachineOptions {
 export class VirtualMachine implements VirtualMachineOptions {
   actor: Thing;
   stack: StackFrame[] = [];
-  registers: Record<string, string> = {};
+  machineRegisters: Record<string, string> = {};
   input: string;
 
   constructor(options: VirtualMachineOptions) {
@@ -84,10 +91,10 @@ export class VirtualMachine implements VirtualMachineOptions {
   }
 
   run() {
-    const result = this.evaluate(0);
+    const result = textParser(this);
     if (this.stack.length > 0) {
       throw new Error(`Stack error. Stack is not empty at termination.`);
     }
-    return result.value;
+    return result.text;
   }
 }

@@ -1,32 +1,4 @@
-import { StackFrame, VirtualMachine } from "./virtual-machine";
-
-export type VirtualMachineFunction = (frame: StackFrame) => string | undefined | void;
-
-function addFn(frame: StackFrame) {
-  return String(frame.parameters.reduce((prev, curr) => prev + Number(curr), 0));
-}
-
-function nameFn(frame: StackFrame) {
-  let result = frame.vm.actor.name;
-  if (frame.parameters.length) {
-    result = result + "<" + frame.parameters.join(",") + ">";
-  }
-  return result;
-}
-
-function repeatFn(frame: StackFrame) {
-  if (frame.parameters.length !== 2) {
-    throw new Error(`Function error. ${frame.name} expects 2 parameters`);
-  }
-
-  return frame.parameters[0].repeat(parseInt(frame.parameters[1]) || 1);
-}
-
-const FUNCTION_LOOKUP: Record<string, VirtualMachineFunction> = {
-  add: addFn,
-  name: nameFn,
-  repeat: repeatFn,
-};
+import { StackFrame, VirtualMachine } from "../vm/virtual-machine";
 
 export function executeFunction(frame: StackFrame) {
   const fn = FUNCTION_LOOKUP[frame.name];
@@ -109,4 +81,59 @@ export function functionParser(vm: VirtualMachine) {
   }
 
   return { name, parameters, index };
+}
+
+function escape(vm: VirtualMachine, index: number) {
+  const current = vm.input[index];
+  switch (current) {
+    case "n":
+      return { value: vm.actor.name, index: index };
+    case "r":
+      return { value: "\n", index: index };
+    case "b":
+      return { value: " ", index: index };
+    default:
+      return { value: current, index: index };
+  }
+}
+
+export function textParser(vm: VirtualMachine) {
+  let index = 0;
+  let input = vm.input;
+  let state: "text" | "parameters" | "name" = "text";
+  let previous = "";
+  let text = "";
+
+  function addText(current: string) {
+    text = text + current;
+  }
+
+  LOOP: for (; index < input.length; ++index) {
+    let current = input[index];
+    switch (state) {
+      case "text":
+        if (previous === "%") {
+          const results = escape(vm, index);
+          addText(results.value);
+          index = results.index;
+        } else {
+          switch (current) {
+            case "%":
+              break;
+            case "[":
+              const results = vm.evaluate(index + 1);
+              addText(results.value);
+              index = results.index;
+              break;
+            default:
+              addText(current);
+              break;
+          }
+        }
+        break;
+    }
+    previous = current;
+  }
+
+  return { text, index };
 }

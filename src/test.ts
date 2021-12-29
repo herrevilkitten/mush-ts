@@ -1,7 +1,7 @@
 import { Thing } from "./models/thing";
-import { VirtualMachine } from "./parsers/virtual-machine";
+import { VirtualMachine } from "./vm/virtual-machine";
 
-const tests2 = ["add(1,2,3,4)", "name()", "name([add(1,2,3)])", "name(1, ,[add(1,2,3)])", "repeat(%n,3)"];
+const tests2 = ["add(1,2,3,4)", "name()", "name([add(1,2,3)])", "name(1, ,[add(1,2,3)])", "@emit Hello, [repeat(%n, 3)]"];
 
 const actor = new Thing();
 actor.name = "Earl";
