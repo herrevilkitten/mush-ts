@@ -1,12 +1,14 @@
-import { Attribute } from "./attribute";
+import { Attribute, AttributeValueType, createAttribute } from "./attribute";
+import { dbref, ID } from "./dbref";
 
 export type ThingType = "room" | "exit" | "player";
 
 export class Thing {
-  id = 0;
+  id: dbref = 0;
+  owner: dbref = 0;
+  parent: dbref = -1;
+  location: dbref = 0;
   name = "";
-  description = "";
-  type: ThingType = "room";
 
   contents = new Set<Thing>();
   attributes = new Map<string, Attribute>();
@@ -18,4 +20,19 @@ export class Thing {
   getTriggers() {
     return [...this.attributes.values()].filter((entry) => entry.type === "trigger");
   }
+
+  createAttribute(name: string, value: AttributeValueType) {
+    const attribute = createAttribute();
+    attribute.owner = this.id;
+    attribute.name = name;
+    attribute.type = "value";
+    attribute.value = value;
+    return attribute;
+  }
+}
+
+export function createThing() {
+  const thing = new Thing();
+  thing.id = ID.get();
+  return thing;
 }
