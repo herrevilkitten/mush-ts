@@ -145,8 +145,10 @@ function createThingProxy(thing: Thng) {
       if (!t) {
         throw new Error(`Object #${target.id} does not exist.`);
       }
-      console.log("keys", Object.keys(t));
-      return ["id", "parent", "owner", "name"];
+      const keys = Object.keys(t).filter((key) => typeof (t as any)[key] !== "object");
+      keys.push(...t.properties.keys());
+      keys.push(...t.functions.keys());
+      return keys;
     },
   });
 }
@@ -227,6 +229,8 @@ function main() {
   console.log("me.emit", me.emit);
   me.emit("hello");
   me.say("I am saying something.")
+  console.log(Object.keys(me))
+  Object.getOwnPropertyNames(me).forEach((prop) => console.log(prop, me[prop]))
   `
   );
   console.log({ result });
