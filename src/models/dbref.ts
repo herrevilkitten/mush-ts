@@ -10,5 +10,5 @@ export const ID = {
 };
 
 export function isDbRef(id: any): id is dbref {
-  return id.__flavor === "dbref" && typeof id === "number";
+  return id?.__flavor === "dbref" && typeof id === "number";
 }

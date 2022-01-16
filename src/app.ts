@@ -1,35 +1,14 @@
-import { Client, ClientState } from "./clients/client";
+import { Client, CLIENTS, ClientState } from "./clients/client";
+import { Thing } from "./models/thing";
+import { World } from "./world";
 
 const TICKS_PER_SECOND = 10;
 const MILLISECONDS_PER_TICK = 1000 / TICKS_PER_SECOND;
 
-function startDiscordConnectionManager() {
-  const commandQueue = new Queue("command", REDIS_URL);
-  const discordQueue = new Queue("discord", REDIS_URL);
-
-  const inputProcessor: ProcessCallbackFunction<CommandMessage> = async (
-    job
-  ) => {
-    const data = job.data;
-    console.log("backend: job:", job.id, job.data);
-    if (!data.type) {
-      return { type: "error", message: "Invalid request type" };
-    }
-
-    const clientId = data.from;
-    let client = WORLD.clients.get(clientId);
-    if (!client) {
-      client = new DiscordClient(clientId, discordQueue);
-      WORLD.clients.set(clientId, client);
-    }
-
-    client.input.add(data.original);
-  };
-
-  commandQueue.process(10, inputProcessor);
-}
-
 export function main() {
+  console.log("Starting main");
+  const WORLD = new World();
+
   function processLoginInput(client: Client, input: string) {
     const args = input.split(/\s+/);
     const command = args.shift()?.toLowerCase();
@@ -46,11 +25,11 @@ export function main() {
         if (WORLD.players.getByName(playerName)) {
           return client.send(`A player named '${playerName}' already exists.`);
         }
-        let player = new Player();
+        let player = WORLD.database.create();
+        player.name = playerName;
         client.player = player;
-        player.client = client;
-        player.state = PlayerState.PLAYING;
-        player.room = WORLD.rooms.get(0);
+        WORLD.connections.set(player, client);
+        player.location = WORLD.settings.starting.room;
         return client.send(`Welcome to the world, ${playerName}.`);
         break;
       case "connect":
@@ -69,25 +48,17 @@ export function main() {
     }
   }
 
-
   function processPlayingInput(client: Client, input: string) {
     console.log("Playing", input);
-    const args = input.split(/\s+/);
-    const command = args.shift()?.toLowerCase();
-    if (!command) {
+    if (!input) {
       return client.send("Huh?");
     }
-    const results = WORLD.findCommand(command);
-    if (results === undefined) {
+    if (!client.player) {
+      return console.error("Client is sending commands with no attached player", client);
+    }
+    const results = WORLD.findCommand(client.player, input);
+    if (!results) {
       return client.send(`Huh?`);
-    } else if (Array.isArray(results)) {
-      return client.send(
-        `What do you mean? ${results.map((entry) => entry.phrase).join(", ")}`
-      );
-    } else if (results.action) {
-      results.action(client.player, command, args);
-    } else {
-      console.error(`Command '${command}' has no corresponding action.`);
     }
   }
 
@@ -103,8 +74,6 @@ export function main() {
       // The client does not have an attached player, so only the "login" commands are
       // allowed.
       return processLoginInput(client, input);
-    } else if (client.player.state !== PlayerState.PLAYING) {
-      return processCharacterCreationInput(client, input);
     } else {
       return processPlayingInput(client, input);
     }
@@ -123,6 +92,7 @@ export function main() {
   }
 
   function gameLoop() {
+    console.log("Starting game loop");
     let inLoop = false;
     let counter = 0;
     const loopTimer = setInterval(() => {
@@ -130,7 +100,7 @@ export function main() {
 
       // If the previous iteration is still running, then skip this iteration
       if (counter % 100 == 0) {
-        console.log(`Loop: ${WORLD.clients.size} clients`);
+        //        console.log(`Loop: ${WORLD.clients.size} clients`);
       }
       if (inLoop) {
         return;
@@ -138,7 +108,7 @@ export function main() {
       inLoop = true;
 
       if (counter % 100 == 0) {
-        console.log("Check input");
+        //        console.log("Check input");
       }
 
       // Gather player input
@@ -168,7 +138,9 @@ export function main() {
     }, MILLISECONDS_PER_TICK);
   }
 
-  startDiscordConnectionManager();
+  WORLD.start();
 
   gameLoop();
 }
+
+main();
