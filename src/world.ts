@@ -4,7 +4,8 @@ import { consoleClient } from "./clients/console-client";
 import { dbref } from "./models/dbref";
 import { Thing, ThingMap } from "./models/thing";
 import { Attribute } from "./models/attribute";
-import { doEval, doQuit } from "./commands";
+import { InternalCommands } from "./world/commands";
+import { VirtualMachine } from "./world/virtual-machine";
 
 export class World {
   database = new MemoryDatabase();
@@ -17,8 +18,13 @@ export class World {
       room: 1,
     },
   };
+  vm: VirtualMachine;
+  commands: InternalCommands;
 
-  constructor() {}
+  constructor() {
+    this.vm = new VirtualMachine(this);
+    this.commands = new InternalCommands(this);
+  }
 
   findInternalcommand(actor: Thing, text: string) {
     text = text.trim();
@@ -32,13 +38,13 @@ export class World {
     console.log("findInternalCommand", actor, text, command);
     switch (command) {
       case "@quit":
-        return doQuit(this, actor);
+        return this.commands.doQuit(actor);
       case "@eval":
-        return doEval(this, actor, text);
-        break;
+        return this.commands.doEval(actor, text);
       case "@who":
-        doQuit(this, actor);
-        break;
+        return this.commands.doQuit(actor);
+      case "@define-command":
+        return this.commands.doDefineCommand(actor, text);
     }
     return false;
   }
