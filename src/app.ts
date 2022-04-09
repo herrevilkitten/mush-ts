@@ -1,5 +1,6 @@
 import { Client, CLIENTS, ClientState } from "./clients/client";
 import { Thing } from "./models/thing";
+import { startExpressServer } from "./servers/express-server";
 import { World } from "./world";
 
 const TICKS_PER_SECOND = 10;
@@ -139,6 +140,8 @@ export function main() {
   }
 
   WORLD.start();
+
+  startExpressServer();
 
   gameLoop();
 }
