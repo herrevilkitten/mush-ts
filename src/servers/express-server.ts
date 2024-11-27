@@ -5,6 +5,12 @@ import ExpressSession from "express-session";
 
 const map = new Map();
 
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+  }
+}
+
 export function startExpressServer() {
   console.log("Initialzing express session");
   const sessionParser = ExpressSession({
@@ -17,24 +23,24 @@ export function startExpressServer() {
   const server = createServer(app);
   const wss = new WebSocket.Server({ clientTracking: false, noServer: true });
 
-  server.on('upgrade', function (request: IncomingMessage & Request, socket, head) {
-    console.log('Parsing session from request...');
-  
+  server.on("upgrade", function (request: IncomingMessage & Request, socket, head) {
+    console.log("Parsing session from request...");
+
     sessionParser(request, {} as any, () => {
       if (!request.session.userId) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
         socket.destroy();
         return;
       }
-  
-      console.log('Session is parsed!');
-  
+
+      console.log("Session is parsed!");
+
       wss.handleUpgrade(request, socket, head, function (ws) {
-        wss.emit('connection', ws, request);
+        wss.emit("connection", ws, request);
       });
     });
   });
-  
+
   app.use(Express.static("./public"));
   app.use(sessionParser);
 
